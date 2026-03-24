@@ -2,3 +2,6 @@
 /data
 /append test
 /data/pdfs
+/.venv
+/__pycache__
+/__pycache__/sql_handler.cpython-312.pyc
