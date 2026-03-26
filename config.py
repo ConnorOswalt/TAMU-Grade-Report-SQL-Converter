@@ -118,7 +118,7 @@ PARQUET_COMPRESSION = "snappy"      # snappy, gzip, zstd, none
 PARQUET_ROW_GROUP_SIZE = 128 * 1024 * 1024   # 128 MB target
 
 # Whether to try using Delta Lake format (requires delta-spark package)
-USE_DELTA_LAKE = False
+USE_DELTA_LAKE = True
 
 # ────────────────────────────────────────────────────────────────
 #  SQLite Table Names

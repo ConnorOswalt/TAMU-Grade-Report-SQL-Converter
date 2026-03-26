@@ -94,4 +94,3 @@ Real-world application of pandas, SQL, and visualization libraries
 
 Built by Connor Oswalt
 Perfect for demonstrating Python + SQL + analytics skills in data science, analytics, or intelligent systems roles (especially those involving IoT/sensor data or agricultural machinery).
-Star ⭐ the repo if you find it useful!

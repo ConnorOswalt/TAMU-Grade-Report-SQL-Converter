@@ -1,0 +1,30 @@
+# Core dependencies for TAMU Grade Consolidator
+
+# PDF downloading & parallel processing
+requests>=2.32.0
+tqdm>=4.66.0
+
+# PDF extraction
+pdfplumber>=0.11.0
+tabula-py>=2.9.0
+
+# Data processing & storage
+pandas>=2.2.0
+numpy>=1.26.0
+sqlalchemy>=2.0.0
+
+# PySpark ecosystem
+pyspark>=3.5.0
+pyarrow>=15.0.0
+
+# Optional: Web UI
+streamlit>=1.32.0
+
+# Development & utilities
+python-dotenv>=1.0.0
+
+# =============================================
+# Notes:
+# - Python 3.11+ recommended
+# - Run: pip install -r requirements.txt
+# =============================================
