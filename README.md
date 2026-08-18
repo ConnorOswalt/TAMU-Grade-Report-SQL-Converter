@@ -12,6 +12,10 @@ It pulls raw data files, intelligently extracts metadata from filenames, standar
 
 This project showcases real-world **data engineering** and **exploratory data analysis (EDA)** skills — exactly the kind of work done daily in data science & analytics roles.
 
+## Published Dashboard
+
+View the published Databricks dashboard: [TAMU Grade Report Dashboard](https://dbc-0b583d12-fb33.cloud.databricks.com/dashboardsv3/01f19b35bd9b17059249244e024b3b9e/published?o=7474657376343742)
+
 ## Why This Project Matters
 - Handles real student transcript data at scale
 - Demonstrates a complete production-style analytics workflow
