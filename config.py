@@ -158,6 +158,47 @@ URL_TEMPLATE = (
 SEMESTER_URL_CODE = {1: "1", 2: "2", 3: "3"}  # currently numeric
 
 # ────────────────────────────────────────────────────────────────
+#  Degree Plan Scraper Settings
+# ────────────────────────────────────────────────────────────────
+# TAMU's undergraduate catalog (catalog.tamu.edu) runs on the CourseLeaf CMS.
+# Degree plan pages render a "Plan of Study Grid" table (class="sc_plangrid")
+# with one sub-table per year (First Year, Second Year, ...) broken into terms
+# (Fall/Spring/Summer). This structure is consistent for majors that publish a
+# complete 4-year plan directly in the catalog (most non-ETAM majors).
+#
+# NOTE: Some Engineering majors (e.g. Computer Science, Mechanical Engineering)
+# only publish a shared "First Year" table in the catalog because students enter
+# a specific major later via the Entry-To-A-Major (ETAM) process -- years 2-4 for
+# those majors are not on this page and need a different source.
+
+DEGREE_PLAN_DIR = DATA_DIR / "degree_plans"
+DEGREE_PLAN_HTML_DIR = DEGREE_PLAN_DIR / "html"
+DEGREE_PLAN_DIR.mkdir(parents=True, exist_ok=True)
+DEGREE_PLAN_HTML_DIR.mkdir(parents=True, exist_ok=True)
+
+# Map of major name -> catalog degree-plan URL.
+# Add entries here as you find them (see README for how to locate them).
+DEGREE_PLAN_SOURCES = {
+    "Computer Science - BS": "https://catalog.tamu.edu/undergraduate/engineering/computer-science/bs/",
+    "Mechanical Engineering - BS": "https://catalog.tamu.edu/undergraduate/engineering/mechanical/bs/",
+    "Biomedical Engineering - BS": "https://catalog.tamu.edu/undergraduate/engineering/biomedical/bs/",
+    "Biology - BS": "https://catalog.tamu.edu/undergraduate/arts-and-sciences/biology/bs/",
+    "Chemistry - BS": "https://catalog.tamu.edu/undergraduate/arts-and-sciences/chemistry/bs/",
+    "Mathematics - BS": "https://catalog.tamu.edu/undergraduate/arts-and-sciences/mathematics/bs/",
+    "Psychology - BS": "https://catalog.tamu.edu/undergraduate/arts-and-sciences/psychological-and-brain-sciences/psychology-bs/",
+    "Accounting - BBA": "https://catalog.tamu.edu/undergraduate/business/accounting/bba/",
+}
+
+DEGREE_PLAN_USER_AGENT = (
+    "TAMU-Grade-Consolidator/1.0 (research/education; contact: your.email@example.com)"
+)
+
+DEGREE_PLAN_REQUEST_TIMEOUT = 30
+DEGREE_PLAN_RETRY_ATTEMPTS = 3
+DEGREE_PLAN_BACKOFF_FACTOR = 1.5
+DEGREE_PLAN_INTER_REQUEST_SLEEP = 1.0  # be polite between majors
+
+# ────────────────────────────────────────────────────────────────
 #  Export / make available
 # ────────────────────────────────────────────────────────────────
 
@@ -170,4 +211,8 @@ __all__ = [
     "SPARK_PARTITION_COLS", "PARQUET_COMPRESSION", "USE_DELTA_LAKE",
     "SQLITE_TABLES", "LOG_LEVEL", "LOG_FILE", "VERBOSE_PARSING",
     "URL_TEMPLATE", "SEMESTER_URL_CODE",
+    "DEGREE_PLAN_DIR", "DEGREE_PLAN_HTML_DIR", "DEGREE_PLAN_SOURCES",
+    "DEGREE_PLAN_USER_AGENT", "DEGREE_PLAN_REQUEST_TIMEOUT",
+    "DEGREE_PLAN_RETRY_ATTEMPTS", "DEGREE_PLAN_BACKOFF_FACTOR",
+    "DEGREE_PLAN_INTER_REQUEST_SLEEP",
 ]
