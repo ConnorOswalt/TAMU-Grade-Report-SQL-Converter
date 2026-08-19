@@ -50,14 +50,24 @@ def build_url(year: int, semester: int, report_type: str, college: str) -> str:
     )
 
 
-def get_local_path(year: int, semester: int, report_type: str, college: str) -> Path:
+def get_local_path(
+    year: int,
+    semester: int,
+    report_type: str,
+    college: str,
+    pdf_dir: Path = PDF_DIR
+) -> Path:
     """
     Generate consistent local filename and path.
-    Example: data/pdfs/grd_2023_3_EN.pdf
+    grd reports are nested under a 'grd' subfolder (matching main.py's expected
+    layout); gpad/gpac reports stay flat in pdf_dir.
+    Example: data/pdfs/grd/grd_2023_3_EN.pdf, data/pdfs/gpac_2023_3_EN.pdf
     """
     semester_str = f"{semester:01d}"
     filename = f"{report_type}_{year}_{semester_str}_{college}.pdf"
-    return PDF_DIR / filename
+    if report_type == "grd":
+        return pdf_dir / "grd" / filename
+    return pdf_dir / filename
 
 
 def generate_all_urls_and_paths(
@@ -76,7 +86,7 @@ def generate_all_urls_and_paths(
             for rtype in report_types:
                 for college in colleges:
                     url = build_url(year, sem, rtype, college)
-                    path = get_local_path(year, sem, rtype, college)
+                    path = get_local_path(year, sem, rtype, college, pdf_dir)
                     tasks.append((url, path))
     return tasks
 
@@ -209,3 +219,26 @@ def download_all(
 
     success_count = sum(1 for _, s, _ in results if s)
     logging.info(f"Download finished: {success_count}/{len(tasks)} successful")
+
+
+if __name__ == "__main__":
+    from config import (
+        DEFAULT_YEARS_TO_PROCESS_FIRST,
+        REPORT_TYPES,
+        COLLEGE_CODES,
+    )
+
+    logging.basicConfig(level=logging.INFO)
+
+    # De-dupe COLLEGE_CODES (config.py has a couple of accidental repeats)
+    colleges = list(dict.fromkeys(COLLEGE_CODES))
+    semesters = list(SEMESTER_URL_CODE.keys())
+
+    tasks = generate_all_urls_and_paths(
+        years=DEFAULT_YEARS_TO_PROCESS_FIRST,
+        semesters=semesters,
+        report_types=REPORT_TYPES,
+        colleges=colleges,
+    )
+    logging.info(f"Checking {len(tasks)} possible report files (existing valid files are skipped)")
+    download_all(tasks)

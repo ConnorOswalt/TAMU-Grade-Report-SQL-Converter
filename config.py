@@ -17,7 +17,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 DATA_DIR = PROJECT_ROOT / "data"
 PDF_DIR = DATA_DIR / "pdfs"
 PARQUET_DIR = DATA_DIR / "parquet"
-SQLITE_DB_PATH = DATA_DIR / "grades.db"
+# main.py's grade ETL writes to this path (its append_df_to_db call uses this
+# same default) -- kept at the project root so all grade + degree-plan tables
+# live in one database.
+SQLITE_DB_PATH = PROJECT_ROOT / "tamu_grades.db"
 
 # Ensure directories exist (you can call this from main.py if desired)
 for d in [DATA_DIR, PDF_DIR, PARQUET_DIR]:

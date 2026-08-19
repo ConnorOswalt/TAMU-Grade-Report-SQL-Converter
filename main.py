@@ -26,15 +26,17 @@ def parse_grd_filename(filename: str) -> list[str]:
     # Split on underscore
     parts = base.split('_')
 
-    # We expect exactly 4 parts: ['grd', 'YYYY', 'S', 'COLLEGE']
+    # We expect at least 4 parts: ['grd', 'YYYY', 'S', 'COLLEGE', ...]
+    # Some colleges have underscores in their code (e.g. MD_PROF), so anything
+    # after the 3rd part is joined back together as the college code.
 
-    if len(parts) != 4 or parts[0].lower() != 'grd':
+    if len(parts) < 4 or parts[0].lower() != 'grd':
         print(f"Warning: Unexpected filename format: {filename}")
         return ["Unknown", "Unknown", "Unknown"]
 
     year = parts[1]
     semester_code = parts[2]
-    college_code = parts[3].upper()
+    college_code = '_'.join(parts[3:]).upper()
 
     # Semester mapping
     semester_map = {
@@ -47,6 +49,7 @@ def parse_grd_filename(filename: str) -> list[str]:
     # College mapping (expand as needed)
     college_map = {
         'MD': 'Medicine',
+        'MD_PROF': 'Medicine - Professional',
         'NU': 'Nursing',
         'EN': 'Engineering',
         'BA': 'Business',
