@@ -14,6 +14,7 @@ majors then averaged and min-max rescaled. 100 = hardest major in the set,
 absolute scale.
 """
 
+import math
 from typing import Optional
 
 import pandas as pd
@@ -24,6 +25,11 @@ from sql_handler import connect_to_db, table_exists
 
 STATS_COLUMNS = ["course_subject", "course_number", "mean_gpa", "fail_rate", "drop_rate", "n_students"]
 _REQUIRED_RAW_COLUMNS = {"Class Code", "GPA", "F", "Total A-F", "Q", "X", "Total"}
+
+
+def _credit_hours(row: pd.Series) -> float:
+    value = pd.to_numeric(row.get("credit_hours"), errors="coerce")
+    return float(value) if pd.notna(value) and value > 0 else 0.0
 
 
 def load_course_stats(
@@ -97,43 +103,89 @@ def _rollup_major(major_df: pd.DataFrame) -> dict:
     gpa_sum = 0.0
     fail_sum = 0.0
     drop_sum = 0.0
+    total_course_hours = 0.0
+    support_weights = []
+    matched_course_count = 0
+    total_course_count = 0
 
     courses = major_df[major_df["row_type"] == "course"]
     for _, row in courses.iterrows():
-        hours = row.get("credit_hours") or 0
+        hours = _credit_hours(row)
+        total_course_hours += hours
+        total_course_count += 1
         if pd.notna(row.get("mean_gpa")):
             weight_total += hours
             gpa_sum += row["mean_gpa"] * hours
             fail_sum += (row.get("fail_rate") or 0) * hours
             drop_sum += (row.get("drop_rate") or 0) * hours
+            matched_course_count += 1
+            if pd.notna(row.get("n_students")) and row["n_students"] > 0 and hours > 0:
+                support_weights.append((hours, row["n_students"]))
 
     headers = major_df[major_df["row_type"] == "choice_header"]
     for _, header in headers.iterrows():
         gid = header["choice_group_id"]
-        hours = header.get("credit_hours") or 0
+        hours = _credit_hours(header)
         options = major_df[(major_df["choice_group_id"] == gid) & (major_df["row_type"] == "choice_option")]
         matched = options.dropna(subset=["mean_gpa"])
+        total_course_hours += hours
+        total_course_count += len(options)
         if matched.empty:
             continue
         weight_total += hours
         gpa_sum += matched["mean_gpa"].mean() * hours
         fail_sum += matched["fail_rate"].mean() * hours
         drop_sum += matched["drop_rate"].mean() * hours
+        matched_course_count += len(matched)
+        option_weight = hours / len(matched)
+        for _, option in matched.iterrows():
+            if pd.notna(option.get("n_students")) and option["n_students"] > 0 and option_weight > 0:
+                support_weights.append((option_weight, option["n_students"]))
 
     if weight_total == 0:
-        return {"expected_gpa": None, "avg_fail_rate": None, "avg_drop_rate": None, "matched_credit_hours": 0.0}
+        return {
+            "expected_gpa": None,
+            "avg_fail_rate": None,
+            "avg_drop_rate": None,
+            "matched_credit_hours": 0.0,
+            "total_course_credit_hours": total_course_hours,
+            "coverage_pct": 0.0,
+            "matched_course_count": 0,
+            "total_course_count": total_course_count,
+            "effective_sample_size": 0,
+            "reliability_pct": 0.0,
+        }
+
+    coverage = weight_total / total_course_hours if total_course_hours > 0 else 0
+    support_weight = sum(weight for weight, _ in support_weights)
+    effective_sample_size = (
+        support_weight / sum(weight / students for weight, students in support_weights)
+        if support_weights
+        else 0
+    )
+    reliability = coverage * (1 - math.exp(-effective_sample_size / 500))
 
     return {
         "expected_gpa": gpa_sum / weight_total,
         "avg_fail_rate": fail_sum / weight_total,
         "avg_drop_rate": drop_sum / weight_total,
         "matched_credit_hours": weight_total,
+        "total_course_credit_hours": total_course_hours,
+        "coverage_pct": round(coverage * 100, 1),
+        "matched_course_count": matched_course_count,
+        "total_course_count": total_course_count,
+        "effective_sample_size": round(effective_sample_size),
+        "reliability_pct": round(reliability * 100, 1),
     }
 
 
-def compute_major_difficulty_index(plan_df: pd.DataFrame) -> pd.DataFrame:
+def compute_major_difficulty_index(
+    plan_df: pd.DataFrame,
+    stats_df: pd.DataFrame | None = None,
+) -> pd.DataFrame:
     """Per-major GPA/fail-rate/drop-rate rollup plus a 0-100 relative difficulty_score."""
-    stats_df = load_course_stats()
+    if stats_df is None:
+        stats_df = load_course_stats()
     merged = attach_course_stats(plan_df, stats_df)
 
     rows = []

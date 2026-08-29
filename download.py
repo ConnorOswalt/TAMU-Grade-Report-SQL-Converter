@@ -18,9 +18,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
 from config import (
-    URL_TEMPLATE,
+    REPORT_URL_TEMPLATES,
     SEMESTER_URL_CODE,
-    REPORT_TYPE_PREFIX,
     COLLEGE_CODES,
     PDF_DIR,
     CONCURRENCY,
@@ -38,14 +37,13 @@ def build_url(year: int, semester: int, report_type: str, college: str) -> str:
     if not semester_code:
         raise ValueError(f"Invalid semester code: {semester}")
 
-    rtype_prefix = REPORT_TYPE_PREFIX.get(report_type)
-    if not rtype_prefix:
+    template = REPORT_URL_TEMPLATES.get(report_type)
+    if not template:
         raise ValueError(f"Unknown report type: {report_type}")
 
-    return URL_TEMPLATE.format(
+    return template.format(
         year=year,
-        semester_code=semester_code,
-        rtype_prefix=rtype_prefix,
+        term=semester_code,
         college_code=college
     )
 

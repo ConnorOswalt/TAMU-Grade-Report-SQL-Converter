@@ -147,15 +147,14 @@ VERBOSE_PARSING = False
 #  URL Construction Template
 # ────────────────────────────────────────────────────────────────
 
-# Base pattern observed on TAMU registrar site (as of 2024–2025)
-# May need adjustment if the URL structure changes
-URL_TEMPLATE = (
-    "https://web-as.tamu.edu/GradeReports/PDFReports/"
-    "{year}{semester_code}/{rtype_prefix}{year}{semester_code}{college_code}.pdf"
-)
+# Current report routes used by the Registrar. Each returns a PDF directly.
+REPORT_URL_TEMPLATES = {
+    "grd": "https://web-as.tamu.edu/GradeReports/Report?year={year}&term={term}&college={college_code}",
+    "gpad": "https://web-as.tamu.edu/GradeReports/Report/GPA?year={year}&term={term}&college={college_code}",
+    "gpac": "https://web-as.tamu.edu/GradeReports/Report/Cumulative?year={year}&term={term}&college={college_code}",
+}
 
-# Semester code mapping for URL (sometimes just the number, sometimes letter)
-SEMESTER_URL_CODE = {1: "1", 2: "2", 3: "3"}  # currently numeric
+SEMESTER_URL_CODE = {1: "SPRING", 2: "SUMMER", 3: "FALL"}
 
 # ────────────────────────────────────────────────────────────────
 #  Degree Plan Scraper Settings
@@ -210,7 +209,7 @@ __all__ = [
     "COLLEGE_CODES", "COLLEGE_GROUPS",
     "SPARK_PARTITION_COLS", "PARQUET_COMPRESSION", "USE_DELTA_LAKE",
     "SQLITE_TABLES", "LOG_LEVEL", "LOG_FILE", "VERBOSE_PARSING",
-    "URL_TEMPLATE", "SEMESTER_URL_CODE",
+    "REPORT_URL_TEMPLATES", "SEMESTER_URL_CODE",
     "DEGREE_PLAN_DIR", "DEGREE_PLAN_HTML_DIR", "DEGREE_PLAN_SOURCES",
     "DEGREE_PLAN_USER_AGENT", "DEGREE_PLAN_REQUEST_TIMEOUT",
     "DEGREE_PLAN_RETRY_ATTEMPTS", "DEGREE_PLAN_BACKOFF_FACTOR",

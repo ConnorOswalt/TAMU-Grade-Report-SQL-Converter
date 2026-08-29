@@ -27,12 +27,17 @@ from config import SQLITE_DB_PATH
 from major_difficulty_ranker import attach_course_gpa, load_course_gpa
 
 
+def _credit_hours(row: pd.Series) -> float:
+    value = pd.to_numeric(row.get("credit_hours"), errors="coerce")
+    return float(value) if pd.notna(value) and value > 0 else 0.0
+
+
 def _fixed_course_contribution(major_df: pd.DataFrame) -> Tuple[float, float]:
     """Sum (gpa*hours, hours) across required courses that have grade data."""
     weighted_sum = 0.0
     matched_hours = 0.0
     for _, row in major_df[major_df["row_type"] == "course"].iterrows():
-        hours = row.get("credit_hours") or 0
+        hours = _credit_hours(row)
         gpa = row.get("mean_gpa")
         if pd.notna(gpa):
             weighted_sum += gpa * hours
@@ -44,6 +49,7 @@ def optimize_major_plan(
     plan_df: pd.DataFrame,
     major: str,
     db_path: str = str(SQLITE_DB_PATH),
+    course_gpa_df: Optional[pd.DataFrame] = None,
 ) -> Tuple[Optional[dict], pd.DataFrame]:
     """
     Solve the choice-group selection MILP for one major.
@@ -51,7 +57,8 @@ def optimize_major_plan(
     Returns (summary_dict, selections_df). summary_dict is None if the major
     has no matchable data at all.
     """
-    course_gpa_df = load_course_gpa(db_path)
+    if course_gpa_df is None:
+        course_gpa_df = load_course_gpa(db_path)
     major_df = attach_course_gpa(plan_df[plan_df["major"] == major].copy(), course_gpa_df)
 
     model = gp.Model(f"course_optimizer_{major}")
@@ -68,7 +75,7 @@ def optimize_major_plan(
     headers = major_df[major_df["row_type"] == "choice_header"]
     for _, header in headers.iterrows():
         gid = header["choice_group_id"]
-        hours = header.get("credit_hours") or 0
+        hours = _credit_hours(header)
         options = major_df[(major_df["choice_group_id"] == gid) & (major_df["row_type"] == "choice_option")]
 
         option_vars = []
@@ -131,13 +138,14 @@ def optimize_major_plan(
 def optimize_all_majors(
     plan_df: pd.DataFrame,
     db_path: str = str(SQLITE_DB_PATH),
+    course_gpa_df: Optional[pd.DataFrame] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Run the optimizer for every major in plan_df. Returns (summary_df, all_selections_df)."""
     summaries = []
     all_selections = []
 
     for major in plan_df["major"].unique():
-        summary, selections = optimize_major_plan(plan_df, major, db_path)
+        summary, selections = optimize_major_plan(plan_df, major, db_path, course_gpa_df)
         if summary is not None:
             summaries.append(summary)
             all_selections.append(selections)

@@ -139,33 +139,64 @@ not an absolute scale). Notably reorders the ranking vs. GPA alone --
 Mathematics ranks hardest here despite not having the lowest GPA, because it
 has the highest fail/drop rates.
 
+## Reliability and data quality
+
+Each major result includes a transparent evidence-support score rather than
+claiming a statistical confidence interval that the aggregate public reports
+cannot support:
+
+```text
+reliability = plan coverage * (1 - exp(-N_eff / 500))
+```
+
+`N_eff` is the credit-weighted harmonic enrollment support across the matched
+degree-plan courses. The dashboard also reports plan coverage and `N_eff` so
+the score is auditable. Course reliability uses the same saturating enrollment
+support curve. Reliability describes how much evidence supports an estimate;
+it is not a 95% confidence interval or a probability that the ranking is true.
+
+The production pipeline discovers current bachelor programs from TAMU's
+CourseLeaf program index. The main dashboard shows a compact top 10, while an
+All Majors page shows every discovered program/track: rankable programs in
+difficulty order and unranked programs with the reason they were excluded.
+Tracks and options remain separate because their required courses differ.
+
+The dashboard discloses the main limitations: rankings model default plans
+rather than individual student pathways, some ETAM and elective paths are
+incomplete, FERPA suppresses sections below five students, availability varies
+across colleges and years, and aggregate reports cannot control for prior GPA,
+instructor selection, repeated enrollment, or causal effects. Professional
+reports using non-A-F grading are archived and quarantined instead of being
+mixed into letter-grade analytics.
+
 ## Publishing to Databricks
 
-`export_for_databricks.py` writes the grade distributions, degree plans, and
-both ranker/optimizer outputs to partitioned Parquet under `data/parquet/`.
-Upload that folder to a Unity Catalog Volume (`databricks fs cp` /
-`databricks-sdk` / drag-and-drop in the UI), then run
-`databricks/major_difficulty_dashboard.sql` (a SQL notebook) to load it into
-Delta tables via `read_files()`. This only requires a **serverless SQL
-warehouse** -- no all-purpose cluster needed, which matters if you don't want
-to provision billable compute.
+The production path is a Databricks Asset Bundle (`databricks.yml` and
+`resources/tamu_grade_pipeline.job.yml`). Its serverless Workflow runs six
+times per year, polls TAMU's current GRD/GPAD/GPAC report routes, archives PDFs
+in a Unity Catalog Volume, parses them with Tabula, and uses a checksum manifest
+to prevent duplicate ingestion. It then updates Delta tables, rebuilds the
+major rankings and Gurobi outputs, and republishes the dashboard. Failed or
+unsupported reports remain auditable in the ingestion manifest.
+
+`export_for_databricks.py` and `databricks/major_difficulty_dashboard.sql`
+remain available for local snapshot export and initial table provisioning.
 
 Live setup for this repo: uploaded to `/Volumes/workspace/default/tamu_grades`,
 loaded into `workspace.tamu_grades.*` Delta tables, and published as a
 Lakeview dashboard ("TAMU Major Difficulty & Course Optimizer") with:
 - KPI counters (grade records analyzed, students graded, distinct courses, year range)
-- Expected GPA by major, and the GPA+fail-rate+drop-rate difficulty score
+- Top-10 major overview plus an All Majors page covering every discovered bachelor program/track
+- Expected GPA, GPA+fail-rate+drop-rate difficulty, and reliability support
 - Baseline-vs-Gurobi-optimal GPA comparison and the optimizer's selected electives
-- Top 10 hardest/easiest individual courses (min. 200 students graded), as bar charts
-- University-wide GPA trend by year (grade inflation check)
+- Ranked hardest/easiest course lists with GPA, fail/drop percentage, reliability, and enrollment
+- Weighted GPA trends by college and year
+- A methodology and data-quality panel documenting formulas, scope, and limitations
 
-**Lakeview quirk found while building this:** the "table" widget type silently
-failed to bind fields for aggregated (GROUP BY) query results in this
-workspace -- it rendered fine for a flat, non-aggregated dataset
-(`optimizer_selections`) but showed "Visualization has no fields selected"
-for `hardest_courses`/`easiest_courses` no matter how the column spec was
-adjusted. Bar/line/counter widgets were reliable throughout, so those two
-ended up as bar charts instead of tables.
+**Lakeview quirk found while building this:** table widgets silently failed to
+bind some aggregated query results in this workspace. The ranked course and
+major panels therefore use generated text lists, refreshed by the pipeline,
+while the trend and KPI panels remain live semantic-query visualizations.
 
 ## Installation & Usage
 

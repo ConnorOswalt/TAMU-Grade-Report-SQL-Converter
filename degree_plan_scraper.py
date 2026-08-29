@@ -10,8 +10,10 @@ import random
 import logging
 from pathlib import Path
 from typing import Dict, Optional
+from urllib.parse import urljoin, urlparse
 
 import requests
+from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -24,6 +26,8 @@ from config import (
     DEGREE_PLAN_BACKOFF_FACTOR,
     DEGREE_PLAN_INTER_REQUEST_SLEEP,
 )
+
+PROGRAM_INDEX_URL = "https://catalog.tamu.edu/programs/"
 
 
 def _slugify(name: str) -> str:
@@ -74,6 +78,42 @@ def fetch_degree_plan_html(
             time.sleep(backoff_factor ** attempt + random.uniform(0, 0.5))
 
     return None
+
+
+def discover_bachelor_programs(index_url: str = PROGRAM_INDEX_URL) -> Dict[str, str]:
+    """Discover current bachelor program/track pages from CourseLeaf's program index."""
+    html = fetch_degree_plan_html(index_url)
+    if html is None:
+        raise RuntimeError(f"Could not retrieve TAMU program index: {index_url}")
+
+    soup = BeautifulSoup(html, "html.parser")
+    discovered = []
+    seen_urls = set()
+    for item in soup.select("li.item.filter_1"):
+        link = item.select_one('a[href^="/undergraduate/"]')
+        title_tag = item.select_one("span.title")
+        if link is None or title_tag is None:
+            continue
+        title = " ".join(title_tag.get_text(" ", strip=True).replace("\u200b", "").split())
+        url = urljoin(index_url, link.get("href"))
+        if not title or title.endswith(" - Minor") or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        discovered.append((title, url))
+
+    title_counts = {}
+    for title, _ in discovered:
+        title_counts[title] = title_counts.get(title, 0) + 1
+
+    programs = {}
+    for title, url in discovered:
+        display_name = title
+        if title_counts[title] > 1:
+            parent_slug = urlparse(url).path.rstrip("/").split("/")[-2]
+            department = parent_slug.replace("-", " ").title()
+            display_name = f"{title} ({department})"
+        programs[display_name] = url
+    return programs
 
 
 def get_or_fetch_html(

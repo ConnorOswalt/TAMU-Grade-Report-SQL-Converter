@@ -54,7 +54,8 @@ SELECT * FROM read_files('/Volumes/workspace/default/tamu_grades/major_difficult
 
 -- COMMAND ----------
 
-SELECT major, expected_gpa, coverage_pct, matched_credit_hours
+SELECT major, expected_gpa, coverage_pct, matched_credit_hours,
+  matched_course_count, total_course_count, effective_sample_size, reliability_pct
 FROM workspace.tamu_grades.major_expected_gpa
 ORDER BY expected_gpa DESC;
 
@@ -84,7 +85,8 @@ ORDER BY major, choice_group_id;
 
 -- COMMAND ----------
 
-SELECT major, expected_gpa, avg_fail_rate, avg_drop_rate, difficulty_score
+SELECT major, expected_gpa, avg_fail_rate, avg_drop_rate, difficulty_score,
+  coverage_pct, effective_sample_size, reliability_pct
 FROM workspace.tamu_grades.major_difficulty_index
 ORDER BY difficulty_score DESC;
 
@@ -107,17 +109,16 @@ WHERE TRY_CAST(Year AS INT) IS NOT NULL;
 
 -- MAGIC %md ## Hardest / easiest individual courses (min. 200 students graded)
 -- MAGIC
--- MAGIC Rendered as bar charts in the published dashboard (not tables -- Lakeview's
--- MAGIC "table" widget silently failed to bind these aggregated query results in
--- MAGIC testing, while bar/line/counter widgets worked reliably).
+-- MAGIC The published dashboard renders the hardest courses as a ranked list.
 
 -- COMMAND ----------
 
 SELECT Class_Code AS class_code,
   ROUND(SUM(GPA * Total) / SUM(Total), 2) AS weighted_gpa,
+  ROUND((SUM(F) + SUM(Q) + SUM(X)) * 100.0 / SUM(Total), 2) AS fail_drop_pct,
   CAST(SUM(Total) AS BIGINT) AS n_students
 FROM workspace.tamu_grades.grade_distributions
-WHERE GPA IS NOT NULL AND Total IS NOT NULL
+WHERE GPA > 0 AND Total IS NOT NULL
 GROUP BY Class_Code
 HAVING SUM(Total) >= 200
 ORDER BY weighted_gpa ASC
@@ -127,22 +128,30 @@ LIMIT 10;
 
 SELECT Class_Code AS class_code,
   ROUND(SUM(GPA * Total) / SUM(Total), 2) AS weighted_gpa,
+  ROUND((SUM(F) + SUM(Q) + SUM(X)) * 100.0 / SUM(Total), 2) AS fail_drop_pct,
   CAST(SUM(Total) AS BIGINT) AS n_students
 FROM workspace.tamu_grades.grade_distributions
-WHERE GPA IS NOT NULL AND Total IS NOT NULL
+WHERE GPA > 0 AND Total IS NOT NULL
 GROUP BY Class_Code
 HAVING SUM(Total) >= 200
-ORDER BY weighted_gpa DESC
+ORDER BY weighted_gpa DESC, fail_drop_pct ASC, class_code ASC
 LIMIT 10;
 
 -- COMMAND ----------
 
--- MAGIC %md ## University-wide GPA trend by year (grade inflation check)
+-- MAGIC %md ## GPA trend by college and year (grade inflation check)
 
 -- COMMAND ----------
 
-SELECT TRY_CAST(Year AS INT) AS Year, ROUND(SUM(GPA * Total) / SUM(Total), 3) AS weighted_gpa
+SELECT
+  College,
+  TRY_CAST(Year AS INT) AS Year,
+  ROUND(SUM(GPA * Total) / SUM(Total), 3) AS weighted_gpa
 FROM workspace.tamu_grades.grade_distributions
-WHERE GPA IS NOT NULL AND Total IS NOT NULL AND TRY_CAST(Year AS INT) IS NOT NULL
-GROUP BY TRY_CAST(Year AS INT)
-ORDER BY Year;
+WHERE GPA IS NOT NULL
+  AND Total IS NOT NULL
+  AND TRY_CAST(Year AS INT) IS NOT NULL
+  AND College IS NOT NULL
+  AND TRIM(College) <> ''
+GROUP BY College, TRY_CAST(Year AS INT)
+ORDER BY College, Year;

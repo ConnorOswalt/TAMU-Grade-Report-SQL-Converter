@@ -1,0 +1,33 @@
+resources:
+  jobs:
+    tamu_grade_report_pipeline:
+      name: TAMU Grade Report Pipeline
+      description: Polls TAMU for GRD, GPAD, and GPAC PDFs, parses them with Tabula, updates Delta tables, and rebuilds dashboard metrics.
+      schedule:
+        quartz_cron_expression: 0 0 12 15 1,3,5,7,9,11 ?
+        timezone_id: America/Chicago
+        pause_status: UNPAUSED
+      email_notifications:
+        on_failure:
+          - ${var.notification_email}
+      timeout_seconds: 7200
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: ingest_and_refresh
+          environment_key: pipeline_environment
+          spark_python_task:
+            python_file: ../databricks/tamu_grade_pipeline.py
+            parameters:
+              - --project-root
+              - ${workspace.file_path}
+      environments:
+        - environment_key: pipeline_environment
+          spec:
+            client: "2"
+            dependencies:
+              - numpy==1.26.4
+              - pandas==2.2.3
+              - tabula-py==2.10.0
+              - gurobipy==13.0.2
+              - databricks-sdk==0.132.0
+              - beautifulsoup4==4.13.4

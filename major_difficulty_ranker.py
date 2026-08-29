@@ -18,6 +18,7 @@ PDFs. SUBJECT_ALIASES below maps a plan's subject code to the code(s) it may
 appear as historically -- add entries here as you discover more renames.
 """
 
+import math
 from typing import Optional
 
 import pandas as pd
@@ -31,6 +32,11 @@ NON_COURSE_ROW_TYPES = {"term_subtotal", "plan_total", "choice_header"}
 SUBJECT_ALIASES = {
     "PBSI": ["PSYC"],
 }
+
+
+def _credit_hours(row: pd.Series) -> float:
+    value = pd.to_numeric(row.get("credit_hours"), errors="coerce")
+    return float(value) if pd.notna(value) and value > 0 else 0.0
 
 
 def load_course_gpa(
@@ -137,32 +143,54 @@ def compute_major_expected_gpa(merged_df: pd.DataFrame) -> pd.DataFrame:
         weight_total = 0.0
         matched_hours = 0.0
         total_course_hours = 0.0
+        support_weights = []
+        matched_course_count = 0
+        total_course_count = 0
 
         # Plain required courses
         courses = major_df[major_df["row_type"] == "course"]
         for _, row in courses.iterrows():
-            hours = row.get("credit_hours") or 0
+            hours = _credit_hours(row)
             total_course_hours += hours
+            total_course_count += 1
             if pd.notna(row.get("mean_gpa")):
                 weighted_sum += row["mean_gpa"] * hours
                 weight_total += hours
                 matched_hours += hours
+                matched_course_count += 1
+                if pd.notna(row.get("n_students")) and row["n_students"] > 0 and hours > 0:
+                    support_weights.append((hours, row["n_students"]))
 
         # Choice blocks: use the choice_header's credit hours, average GPA of its options
         headers = major_df[major_df["row_type"] == "choice_header"]
         for _, header_row in headers.iterrows():
             group_id = header_row["choice_group_id"]
             group_rows = major_df[major_df["choice_group_id"] == group_id]
-            hours = header_row.get("credit_hours") or 0
+            options = group_rows[group_rows["row_type"] == "choice_option"]
+            matched_options = options.dropna(subset=["mean_gpa"])
+            hours = _credit_hours(header_row)
             total_course_hours += hours
+            total_course_count += len(options)
             gpa = _resolve_choice_group_gpa(group_rows)
             if gpa is not None:
                 weighted_sum += gpa * hours
                 weight_total += hours
                 matched_hours += hours
+                matched_course_count += len(matched_options)
+                option_weight = hours / len(matched_options) if len(matched_options) else 0
+                for _, option in matched_options.iterrows():
+                    if pd.notna(option.get("n_students")) and option["n_students"] > 0 and option_weight > 0:
+                        support_weights.append((option_weight, option["n_students"]))
 
         expected_gpa = weighted_sum / weight_total if weight_total > 0 else None
         coverage = matched_hours / total_course_hours if total_course_hours > 0 else 0
+        support_weight = sum(weight for weight, _ in support_weights)
+        effective_sample_size = (
+            support_weight / sum(weight / students for weight, students in support_weights)
+            if support_weights
+            else 0
+        )
+        reliability = coverage * (1 - math.exp(-effective_sample_size / 500))
 
         results.append(
             {
@@ -171,6 +199,10 @@ def compute_major_expected_gpa(merged_df: pd.DataFrame) -> pd.DataFrame:
                 "matched_credit_hours": matched_hours,
                 "total_course_credit_hours": total_course_hours,
                 "coverage_pct": round(coverage * 100, 1),
+                "matched_course_count": matched_course_count,
+                "total_course_count": total_course_count,
+                "effective_sample_size": round(effective_sample_size),
+                "reliability_pct": round(reliability * 100, 1),
             }
         )
 
@@ -182,9 +214,11 @@ def rank_majors(
     plan_df: pd.DataFrame,
     db_path: str = str(SQLITE_DB_PATH),
     grade_table: str = "all_grade_distributions",
+    course_gpa_df: Optional[pd.DataFrame] = None,
 ) -> pd.DataFrame:
     """End-to-end: attach historical GPA to a degree-plan DataFrame and rank majors."""
-    course_gpa_df = load_course_gpa(db_path, grade_table)
+    if course_gpa_df is None:
+        course_gpa_df = load_course_gpa(db_path, grade_table)
     merged = attach_course_gpa(plan_df, course_gpa_df)
     return compute_major_expected_gpa(merged)
 

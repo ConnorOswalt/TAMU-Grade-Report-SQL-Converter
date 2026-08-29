@@ -1,0 +1,23 @@
+bundle:
+  name: tamu-grade-report-pipeline
+
+include:
+  - resources/*.yml
+
+workspace:
+  host: https://dbc-0b583d12-fb33.cloud.databricks.com
+
+variables:
+  notification_email:
+    default: connor.l.oswalt@gmail.com
+
+targets:
+  dev:
+    default: true
+    mode: development
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+  prod:
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
