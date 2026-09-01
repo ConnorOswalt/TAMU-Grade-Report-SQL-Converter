@@ -10,6 +10,9 @@ workspace:
 variables:
   notification_email:
     default: connor.l.oswalt@gmail.com
+  sql_warehouse_id:
+    description: "SQL Warehouse ID for running dashboard queries (find in Databricks SQL workspace)"
+    default: ""
 
 targets:
   dev:

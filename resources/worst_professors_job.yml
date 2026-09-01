@@ -1,0 +1,19 @@
+resources:
+  jobs:
+    worst_professors_analysis:
+      name: Worst Professors Analysis
+      description: Analyzes instructor performance to identify professors giving the lowest grades and highest fail rates. Runs automatically after TAMU Grade Report Pipeline completes (PDFs ingested).
+      email_notifications:
+        on_failure:
+          - ${var.notification_email}
+      timeout_seconds: 3600
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: analyze_worst_professors
+          depends_on:
+            - task_key: ingest_and_refresh
+              job_key: tamu_grade_report_pipeline
+          sql_task:
+            warehouse_id: ${var.sql_warehouse_id}
+            notebook:
+              path: /Workspace/Shared/tamu-grade-report/worst_professors_lakeview
